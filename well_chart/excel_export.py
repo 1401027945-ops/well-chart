@@ -102,7 +102,12 @@ def _write_raw_sheet(ws, df_raw: pd.DataFrame) -> None:
         excel_row = i + 2
         ws.cell(row=excel_row, column=1, value=row["日期"]).number_format = "yyyy-mm-dd hh:mm:ss"
         for j, col in enumerate(columns[1:], start=2):
-            ws.cell(row=excel_row, column=j, value=row[col])
+            value = row[col]
+            if col == "瞬时气量" and pd.notna(value):
+                value = round(float(value), 4)
+            cell = ws.cell(row=excel_row, column=j, value=value)
+            if col == "瞬时气量":
+                cell.number_format = "0.0000"
     ws.freeze_panes = "A2"
     for j in range(1, len(columns) + 1):
         ws.column_dimensions[get_column_letter(j)].width = 18
@@ -129,7 +134,9 @@ def _write_clean_sheet(ws, df_clean: pd.DataFrame, stats: CleaningStats) -> None
             value = row[col]
             if col.endswith("_插值标记") and pd.notna(value):
                 value = FLAG_NAMES.get(int(value), str(value))
-            ws.cell(row=excel_row, column=j, value=value)
+            cell = ws.cell(row=excel_row, column=j, value=value)
+            if col == "瞬时气量":
+                cell.number_format = "0.0000"
     ws.freeze_panes = "A2"
     for j in range(1, len(columns) + 1):
         ws.column_dimensions[get_column_letter(j)].width = 18
