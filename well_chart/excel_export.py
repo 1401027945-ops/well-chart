@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import io
+import math
 
 import pandas as pd
 from openpyxl import Workbook
@@ -173,6 +174,31 @@ def _excel_serial(ts: pd.Timestamp) -> float:
     return (ts - pd.Timestamp("1899-12-30")).total_seconds() / 86400.0
 
 
+def _integer_step(value_range: float) -> int:
+    """为纵轴选择“合适的整数”刻度步长（1/2/5×10^n）。"""
+    if value_range <= 0:
+        return 1
+    ideal = value_range / 5.0
+    exp = 10 ** math.floor(math.log10(ideal))
+    for m in (1, 2, 5, 10):
+        if ideal <= m * exp:
+            return int(m * exp)
+    return int(10 * exp)
+
+
+def _y_axis_range(series: pd.Series) -> tuple[float, int, int]:
+    """根据数据计算纵轴：最低 0、最高（+10% 取整）、整数刻度步长。"""
+    valid = pd.to_numeric(series, errors="coerce").dropna()
+    if valid.empty:
+        return 0.0, 1, 1
+    top = max(1.0, float(valid.max()) * 1.1)
+    # 向上取整到整数
+    top = math.ceil(top)
+    step = _integer_step(top)
+    top = math.ceil(top / step) * step
+    return 0.0, int(top), step
+
+
 def _build_native_chart(
     data_ws,
     df_clean: pd.DataFrame,
@@ -185,10 +211,20 @@ def _build_native_chart(
     """
     n_rows = len(df_clean)
     xvalues = Reference(data_ws, min_col=COL_DATE, min_row=2, max_row=n_rows + 1)
+    left_top = _y_axis_range(pd.concat([df_clean["油压"], df_clean["套压"]]))
+    right_top = _y_axis_range(df_clean["瞬时气量"])
 
-    def add_series(chart, col: int, title: str, color_hex: str, width_pt: float) -> None:
+    def add_series(
+        chart,
+        col: int,
+        title: str,
+        color_hex: str,
+        width_pt: float,
+        with_xvalues: bool = True,
+    ) -> None:
         yvalues = Reference(data_ws, min_col=col, min_row=2, max_row=n_rows + 1)
-        ser = Series(yvalues, xvalues, title=title)
+        # 散点图需要 xvalues；折线图只能给数值引用，分类轴由 set_categories 设置
+        ser = Series(yvalues, xvalues, title=title) if with_xvalues else Series(yvalues, title=title)
         ser.marker = Marker(symbol="none")
         ser.graphicalProperties = GraphicalProperties(
             ln=LineProperties(solidFill=color_hex.lstrip("#"), w=int(width_pt * 12700))
@@ -206,11 +242,16 @@ def _build_native_chart(
         chart_left.x_axis.majorGridlines = None
         chart_left.y_axis.majorGridlines = None
         chart_left.y_axis.title = "压力（MPa）"
-        add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL)
-        add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
+        # 折线图序列必须只传数值引用，分类轴用 set_categories 单独设置
+        add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL, with_xvalues=False)
+        add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING, with_xvalues=False)
         chart_left.set_categories(xvalues)
         _style_axis(chart_left.x_axis)
         _style_axis(chart_left.y_axis)
+        chart_left.y_axis.scaling.min = left_top[0]
+        chart_left.y_axis.scaling.max = left_top[1]
+        chart_left.y_axis.majorUnit = left_top[2]
+        chart_left.y_axis.number_format = "0"
 
         chart_right = AreaChart()
         chart_right.grouping = "standard"
@@ -234,6 +275,10 @@ def _build_native_chart(
         chart_right.set_categories(xvalues)
         _style_axis(chart_right.x_axis)
         _style_axis(chart_right.y_axis)
+        chart_right.y_axis.scaling.min = right_top[0]
+        chart_right.y_axis.scaling.max = right_top[1]
+        chart_right.y_axis.majorUnit = right_top[2]
+        chart_right.y_axis.number_format = "0"
 
         chart = chart_left
         chart += chart_right
@@ -258,6 +303,10 @@ def _build_native_chart(
         add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
         _style_axis(chart_left.x_axis)
         _style_axis(chart_left.y_axis)
+        chart_left.y_axis.scaling.min = left_top[0]
+        chart_left.y_axis.scaling.max = left_top[1]
+        chart_left.y_axis.majorUnit = left_top[2]
+        chart_left.y_axis.number_format = "0"
 
         chart_right = ScatterChart()
         chart_right.scatterStyle = "line"
@@ -272,6 +321,10 @@ def _build_native_chart(
         add_series(chart_right, COL_GAS, f"瞬时气量{UNIT_GAS}", COLOR_GAS, LINEWIDTH_GAS)
         _style_axis(chart_right.x_axis)
         _style_axis(chart_right.y_axis)
+        chart_right.y_axis.scaling.min = right_top[0]
+        chart_right.y_axis.scaling.max = right_top[1]
+        chart_right.y_axis.majorUnit = right_top[2]
+        chart_right.y_axis.number_format = "0"
 
         chart = chart_left
         chart += chart_right
