@@ -180,7 +180,7 @@ def run_single_well_flow(
                 "固定值段数": [
                     stats.constant_runs.get("油压", 0),
                     stats.constant_runs.get("套压", 0),
-                    "—",
+                    0,  # 瞬时气量不做固定值段检测
                 ],
                 "插值修复点数": [
                     stats.interpolated.get("油压", 0),
