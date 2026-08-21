@@ -18,7 +18,6 @@ from openpyxl.chart import Reference, ScatterChart, Series
 from openpyxl.chart.marker import Marker
 from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.chart.text import Paragraph, RichText
-from openpyxl.drawing.image import Image as XLImage
 from openpyxl.drawing.line import LineProperties
 from openpyxl.drawing.text import CharacterProperties, Font as XLFont, ParagraphProperties
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -216,9 +215,8 @@ def _write_chart_sheet(
     well_name: str,
     stats: CleaningStats,
     chart: ScatterChart,
-    chart_png: bytes,
 ) -> None:
-    """写入“图片”Sheet：信息行 + 渲染图片 + 原生可编辑图表。"""
+    """写入“图片”Sheet：信息行 + 原生可编辑图表（不嵌入静态图片）。"""
     ws["A1"] = (
         f"井号：{well_name}；数据量：{stats.total_rows} 条；"
         f"时间范围：{stats.time_min} ~ {stats.time_max}；采样频率：{stats.frequency}"
@@ -229,17 +227,13 @@ def _write_chart_sheet(
         ws["A2"].font = NOTE_FONT
         ws["A2"].alignment = Alignment(wrap_text=True)
         hint_row = 3
-    ws.cell(row=hint_row, column=1, value="下方为曲线图图片；图片下方是原生可编辑图表，双击即可修改。").font = NOTE_FONT
-
-    # 渲染好的图片（等比缩放到适合页面的宽度）
-    image = XLImage(io.BytesIO(chart_png))
-    scale = 1080 / image.width
-    image.width = 1080
-    image.height = int(image.height * scale)
-    ws.add_image(image, "A5")
+    ws.cell(
+        row=hint_row, column=1,
+        value="下方为原生 Excel 图表，双击即可编辑；修改「处理后的数据」子表中的数值，图表会自动更新。",
+    ).font = NOTE_FONT
 
     # 原生可编辑图表（引用“处理后的数据”子表）
-    ws.add_chart(chart, "A36")
+    ws.add_chart(chart, "A5")
 
 
 def export_excel(
@@ -247,7 +241,6 @@ def export_excel(
     df_clean: pd.DataFrame,
     stats: CleaningStats,
     well_name: str,
-    chart_png: bytes,
 ) -> bytes:
     """生成包含三个子表的 Excel 文件，返回字节内容。"""
     wb = Workbook()
@@ -260,7 +253,7 @@ def export_excel(
 
     ws_chart = wb.create_sheet("图片")
     chart = _build_native_chart(ws_clean, df_clean, stats)
-    _write_chart_sheet(ws_chart, well_name, stats, chart, chart_png)
+    _write_chart_sheet(ws_chart, well_name, stats, chart)
 
     buf = io.BytesIO()
     wb.save(buf)
