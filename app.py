@@ -201,19 +201,18 @@ def run_single_well_flow(df: pd.DataFrame, well_name: str) -> None:
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
     fig = plotting.create_chart(df_clean, well_name, stats)
-    png_bytes = plotting.fig_to_png_bytes(fig)
     st.pyplot(fig)
     plotting.close_fig(fig)
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
-    xlsx_bytes = excel_export.export_excel(df, df_clean, stats, well_name, png_bytes)
+    xlsx_bytes = excel_export.export_excel(df, df_clean, stats, well_name)
     st.download_button(
         label="下载 Excel 文件（含原始数据 / 处理后的数据 / 图片 三个子表）",
         data=xlsx_bytes,
         file_name=f"{well_name}_单井生产曲线.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    st.caption("「图片」子表内含曲线图图片和原生 Excel 图表，双击图表即可编辑。")
+    st.caption("「图片」子表内为原生 Excel 图表，双击即可编辑；修改处理后的数据，图表会自动更新。")
 
 
 def main() -> None:
