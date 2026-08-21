@@ -213,6 +213,9 @@ def clean_well_data(df: pd.DataFrame) -> tuple[pd.DataFrame, CleaningStats]:
 
         # 步骤 3：线性插值并记录标记
         cleaned, flags, unfixed = interpolate_series(cleaned, times, flags)
+        # 瞬时气量自动保留 4 位小数
+        if col == GAS_COLUMN:
+            cleaned = cleaned.round(4)
         stats.interpolated[col] = int((flags == FLAG_INTERPOLATED).sum())
         stats.unfixed[col] = int((flags == FLAG_UNFIXED).sum())
         result[col] = (cleaned, flags)
