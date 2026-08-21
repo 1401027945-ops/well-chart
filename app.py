@@ -143,7 +143,12 @@ def render_coming_soon(name: str) -> None:
     )
 
 
-def run_single_well_flow(df: pd.DataFrame, well_name: str, gas_area: bool = False) -> None:
+def run_single_well_flow(
+    df: pd.DataFrame,
+    well_name: str,
+    template_name: str,
+    gas_area: bool = False,
+) -> None:
     """单井类模板流程：数据预览 → 清洗 → 曲线图 → 下载。
 
     gas_area=True 表示日期叠合曲线模板（瞬时气量为面积图）。
@@ -208,11 +213,15 @@ def run_single_well_flow(df: pd.DataFrame, well_name: str, gas_area: bool = Fals
     plotting.close_fig(fig)
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
-    xlsx_bytes = excel_export.export_excel(df, df_clean, stats, well_name, gas_area=gas_area)
+    xlsx_bytes = excel_export.export_excel(
+        df, df_clean, stats, well_name,
+        template_name=template_name, gas_area=gas_area,
+    )
+    file_name = f"{well_name}_{template_name.replace('模板', '')}.xlsx"
     st.download_button(
-        label="下载 Excel 文件（含原始数据 / 处理后的数据 / 图片 三个子表）",
+        label=f"下载「{template_name}」Excel 文件（含原始数据 / 处理后的数据 / 图片 三个子表）",
         data=xlsx_bytes,
-        file_name=f"{well_name}_单井生产曲线.xlsx",
+        file_name=file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     st.caption("「图片」子表内为原生 Excel 图表，双击即可编辑；修改处理后的数据，图表会自动更新。")
@@ -278,7 +287,7 @@ def main() -> None:
             df = loaded["data"]
             well_name = loaded["well_name"]
         gas_area = selected == "日期叠合曲线模板"
-        run_single_well_flow(df, well_name, gas_area=gas_area)
+        run_single_well_flow(df, well_name, selected, gas_area=gas_area)
     except loader.LoadError as exc:
         st.error(f"文件格式错误：{exc}")
         logger.error("文件格式错误：%s", exc)

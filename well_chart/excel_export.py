@@ -354,13 +354,14 @@ def _build_native_chart(
 
 def _write_chart_sheet(
     ws,
+    template_name: str,
     well_name: str,
     stats: CleaningStats,
     chart: ScatterChart,
 ) -> None:
     """写入“图片”Sheet：信息行 + 原生可编辑图表（不嵌入静态图片）。"""
     ws["A1"] = (
-        f"井号：{well_name}；数据量：{stats.total_rows} 条；"
+        f"模板：{template_name}；井号：{well_name}；数据量：{stats.total_rows} 条；"
         f"时间范围：{stats.time_min} ~ {stats.time_max}；采样频率：{stats.frequency}"
     )
     hint_row = 2
@@ -383,6 +384,7 @@ def export_excel(
     df_clean: pd.DataFrame,
     stats: CleaningStats,
     well_name: str,
+    template_name: str = "单井生产曲线模板",
     gas_area: bool = False,
 ) -> bytes:
     """生成包含三个子表的 Excel 文件，返回字节内容。"""
@@ -396,7 +398,7 @@ def export_excel(
 
     ws_chart = wb.create_sheet("图片")
     chart = _build_native_chart(ws_clean, df_clean, stats, gas_area=gas_area)
-    _write_chart_sheet(ws_chart, well_name, stats, chart)
+    _write_chart_sheet(ws_chart, template_name, well_name, stats, chart)
 
     buf = io.BytesIO()
     wb.save(buf)
