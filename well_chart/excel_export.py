@@ -14,7 +14,7 @@ import io
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.chart import Reference, ScatterChart, Series
+from openpyxl.chart import AreaChart, LineChart, Reference, ScatterChart, Series
 from openpyxl.chart.marker import Marker
 from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.chart.text import Paragraph, RichText
@@ -173,12 +173,20 @@ def _excel_serial(ts: pd.Timestamp) -> float:
     return (ts - pd.Timestamp("1899-12-30")).total_seconds() / 86400.0
 
 
-def _build_native_chart(data_ws, df_clean: pd.DataFrame, stats: CleaningStats) -> ScatterChart:
-    """构建原生可编辑的 Excel 图表（左轴压力、右轴瞬时气量）。"""
+def _build_native_chart(
+    data_ws,
+    df_clean: pd.DataFrame,
+    stats: CleaningStats,
+    gas_area: bool = False,
+):
+    """构建原生可编辑的 Excel 图表（左轴压力、右轴瞬时气量）。
+
+    gas_area=True 时（日期叠合曲线模板），瞬时气量由折线改为面积图。
+    """
     n_rows = len(df_clean)
     xvalues = Reference(data_ws, min_col=COL_DATE, min_row=2, max_row=n_rows + 1)
 
-    def add_series(chart: ScatterChart, col: int, title: str, color_hex: str, width_pt: float) -> None:
+    def add_series(chart, col: int, title: str, color_hex: str, width_pt: float) -> None:
         yvalues = Reference(data_ws, min_col=col, min_row=2, max_row=n_rows + 1)
         ser = Series(yvalues, xvalues, title=title)
         ser.marker = Marker(symbol="none")
@@ -187,49 +195,100 @@ def _build_native_chart(data_ws, df_clean: pd.DataFrame, stats: CleaningStats) -
         )
         chart.series.append(ser)
 
-    # 左轴图表：油压 + 套压
-    chart_left = ScatterChart()
-    chart_left.scatterStyle = "line"
-    chart_left.legend.position = "t"  # 图例在顶部，横向单行
-    chart_left.x_axis.axPos = "b"
-    chart_left.x_axis.majorGridlines = None
-    chart_left.y_axis.majorGridlines = None
-    chart_left.y_axis.title = "压力（MPa）"
-    add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL)
-    add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
-    _style_axis(chart_left.x_axis)
-    _style_axis(chart_left.y_axis)
+    if gas_area:
+        # 日期叠合曲线模板：油压/套压为折线图，瞬时气量为面积图
+        chart_left = LineChart()
+        chart_left.legend.position = "t"
+        chart_left.x_axis.axId = 10
+        chart_left.x_axis.crossAx = 20
+        chart_left.y_axis.axId = 20
+        chart_left.y_axis.crossAx = 10
+        chart_left.x_axis.majorGridlines = None
+        chart_left.y_axis.majorGridlines = None
+        chart_left.y_axis.title = "压力（MPa）"
+        add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL)
+        add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
+        chart_left.set_categories(xvalues)
+        _style_axis(chart_left.x_axis)
+        _style_axis(chart_left.y_axis)
 
-    # 右轴图表：瞬时气量（共享 X 轴，使用独立的右纵轴）
-    chart_right = ScatterChart()
-    chart_right.scatterStyle = "line"
-    chart_right.x_axis.axId = 10
-    chart_right.x_axis.crossAx = 200
-    chart_right.y_axis.axId = 200
-    chart_right.y_axis.crossAx = 10
-    chart_right.y_axis.axPos = "r"
-    chart_right.y_axis.crosses = "max"
-    chart_right.y_axis.majorGridlines = None
-    chart_right.y_axis.title = "瞬时气量（万方/天）"
-    add_series(chart_right, COL_GAS, f"瞬时气量{UNIT_GAS}", COLOR_GAS, LINEWIDTH_GAS)
-    _style_axis(chart_right.x_axis)
-    _style_axis(chart_right.y_axis)
+        chart_right = AreaChart()
+        chart_right.grouping = "standard"
+        chart_right.x_axis.axId = 10
+        chart_right.x_axis.crossAx = 200
+        chart_right.y_axis.axId = 200
+        chart_right.y_axis.crossAx = 10
+        chart_right.y_axis.axPos = "r"
+        chart_right.y_axis.crosses = "max"
+        chart_right.y_axis.majorGridlines = None
+        chart_right.y_axis.title = "瞬时气量（万方/天）"
+        gas_ser = Series(
+            Reference(data_ws, min_col=COL_GAS, min_row=2, max_row=n_rows + 1),
+            title=f"瞬时气量{UNIT_GAS}",
+        )
+        gas_ser.graphicalProperties = GraphicalProperties(
+            solidFill=COLOR_GAS.lstrip("#"),
+            ln=LineProperties(solidFill=COLOR_GAS.lstrip("#"), w=int(LINEWIDTH_GAS * 12700)),
+        )
+        chart_right.series.append(gas_ser)
+        chart_right.set_categories(xvalues)
+        _style_axis(chart_right.x_axis)
+        _style_axis(chart_right.y_axis)
 
-    chart = chart_left
-    chart += chart_right
+        chart = chart_left
+        chart += chart_right
+        # 分类轴：约 6 个日期标签
+        skip = max(1, n_rows // 6)
+        chart.x_axis.number_format = "yyyy/m/d"
+        chart.x_axis.tickLblSkip = skip
+        chart.x_axis.tickMarkSkip = skip
+        chart_right.x_axis.number_format = "yyyy/m/d"
+        chart_right.x_axis.tickLblSkip = skip
+        chart_right.x_axis.tickMarkSkip = skip
+    else:
+        # 单井生产曲线模板：三条均为折线（散点折线，保持真实日期间距）
+        chart_left = ScatterChart()
+        chart_left.scatterStyle = "line"
+        chart_left.legend.position = "t"  # 图例在顶部，横向单行
+        chart_left.x_axis.axPos = "b"
+        chart_left.x_axis.majorGridlines = None
+        chart_left.y_axis.majorGridlines = None
+        chart_left.y_axis.title = "压力（MPa）"
+        add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL)
+        add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
+        _style_axis(chart_left.x_axis)
+        _style_axis(chart_left.y_axis)
+
+        chart_right = ScatterChart()
+        chart_right.scatterStyle = "line"
+        chart_right.x_axis.axId = 10
+        chart_right.x_axis.crossAx = 200
+        chart_right.y_axis.axId = 200
+        chart_right.y_axis.crossAx = 10
+        chart_right.y_axis.axPos = "r"
+        chart_right.y_axis.crosses = "max"
+        chart_right.y_axis.majorGridlines = None
+        chart_right.y_axis.title = "瞬时气量（万方/天）"
+        add_series(chart_right, COL_GAS, f"瞬时气量{UNIT_GAS}", COLOR_GAS, LINEWIDTH_GAS)
+        _style_axis(chart_right.x_axis)
+        _style_axis(chart_right.y_axis)
+
+        chart = chart_left
+        chart += chart_right
+
+        # X 轴：日期格式 + 等时间间隔刻度（6 个，间隔 = 跨度/5）
+        tmin, tmax = stats.time_min, stats.time_max
+        span_days = (tmax - tmin).total_seconds() / 86400.0
+        chart.x_axis.number_format = "yyyy/m/d"
+        chart.x_axis.majorUnit = span_days / 5.0
+        chart.x_axis.scaling.min = _excel_serial(tmin)
+        chart.x_axis.scaling.max = _excel_serial(tmax)
+
     _style_legend(chart.legend)
     # 图表边框：默认黑色
     chart.graphical_properties = GraphicalProperties(
         ln=LineProperties(solidFill="000000", w=9525)
     )
-
-    # X 轴：日期格式 + 等时间间隔刻度（6 个，间隔 = 跨度/5）
-    tmin, tmax = stats.time_min, stats.time_max
-    span_days = (tmax - tmin).total_seconds() / 86400.0
-    chart.x_axis.number_format = "yyyy/m/d"
-    chart.x_axis.majorUnit = span_days / 5.0
-    chart.x_axis.scaling.min = _excel_serial(tmin)
-    chart.x_axis.scaling.max = _excel_serial(tmax)
 
     # 图表尺寸：12 × 6 英寸 ≈ 30.5 × 15.3 厘米
     chart.width = 30.5
@@ -268,6 +327,7 @@ def export_excel(
     df_clean: pd.DataFrame,
     stats: CleaningStats,
     well_name: str,
+    gas_area: bool = False,
 ) -> bytes:
     """生成包含三个子表的 Excel 文件，返回字节内容。"""
     wb = Workbook()
@@ -279,7 +339,7 @@ def export_excel(
     _write_clean_sheet(ws_clean, df_clean, stats)
 
     ws_chart = wb.create_sheet("图片")
-    chart = _build_native_chart(ws_clean, df_clean, stats)
+    chart = _build_native_chart(ws_clean, df_clean, stats, gas_area=gas_area)
     _write_chart_sheet(ws_chart, well_name, stats, chart)
 
     buf = io.BytesIO()
