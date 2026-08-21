@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# 中间/临时文件
+work/
+tools/
+
+# 生成物（演示输出）
+outputs/*.png
+outputs/*.xlsx
+
+# 操作系统
+Thumbs.db
+.DS_Store
