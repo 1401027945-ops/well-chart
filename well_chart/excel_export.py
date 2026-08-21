@@ -32,6 +32,8 @@ from .config import (
     LINEWIDTH_CASING,
     LINEWIDTH_GAS,
     LINEWIDTH_OIL,
+    UNIT_GAS,
+    UNIT_PRESSURE,
     get_logger,
 )
 
@@ -193,8 +195,8 @@ def _build_native_chart(data_ws, df_clean: pd.DataFrame, stats: CleaningStats) -
     chart_left.x_axis.majorGridlines = None
     chart_left.y_axis.majorGridlines = None
     chart_left.y_axis.title = "压力（MPa）"
-    add_series(chart_left, COL_OIL, "油压", COLOR_OIL, LINEWIDTH_OIL)
-    add_series(chart_left, COL_CASING, "套压", COLOR_CASING, LINEWIDTH_CASING)
+    add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL)
+    add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
     _style_axis(chart_left.x_axis)
     _style_axis(chart_left.y_axis)
 
@@ -209,7 +211,7 @@ def _build_native_chart(data_ws, df_clean: pd.DataFrame, stats: CleaningStats) -
     chart_right.y_axis.crosses = "max"
     chart_right.y_axis.majorGridlines = None
     chart_right.y_axis.title = "瞬时气量（万方/天）"
-    add_series(chart_right, COL_GAS, "瞬时气量", COLOR_GAS, LINEWIDTH_GAS)
+    add_series(chart_right, COL_GAS, f"瞬时气量{UNIT_GAS}", COLOR_GAS, LINEWIDTH_GAS)
     _style_axis(chart_right.x_axis)
     _style_axis(chart_right.y_axis)
 
