@@ -13,7 +13,7 @@ import pandas as pd
 import streamlit as st
 
 from well_chart import cleaning, excel_export, loader, plotting
-from well_chart.config import MIN_ROWS, get_logger
+from well_chart.config import APP_VERSION, MIN_ROWS, get_logger
 
 logger = get_logger()
 
@@ -250,7 +250,7 @@ def main() -> None:
         )
         st.markdown("---")
         st.caption(
-            "版本 1.0\n\n"
+            f"版本 {APP_VERSION}\n\n"
             "· 单井生产曲线模板：已上线\n"
             "· 日期叠合曲线模板：已上线（瞬时气量面积图）\n"
             "· 天数叠合曲线模板：开发中"

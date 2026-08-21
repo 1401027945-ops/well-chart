@@ -10,6 +10,7 @@ import logging
 # 日志
 # ---------------------------------------------------------------------------
 LOGGER_NAME = "well_chart"
+APP_VERSION = "v1.0.6"   # 页面显示的版本号，用于确认部署是否已更新
 
 
 def get_logger() -> logging.Logger:
