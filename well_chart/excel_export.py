@@ -23,7 +23,7 @@ from openpyxl.drawing.text import CharacterProperties, Font as XLFont, Paragraph
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .cleaning import CleaningStats, FLAG_NAMES
+from .cleaning import CleaningStats, FLAG_INTERPOLATED, FLAG_NAMES, FLAG_ORIGINAL, FLAG_UNFIXED
 from .config import (
     COLOR_CASING,
     COLOR_GAS,
@@ -40,6 +40,9 @@ logger = get_logger()
 HEADER_FILL = PatternFill("solid", fgColor="D9E1F2")
 HEADER_FONT = Font(bold=True)
 NOTE_FONT = Font(italic=True, color="808080")
+# 修改数据标色：插值修复 → 浅黄色；无法修复 → 浅红色
+FILL_INTERPOLATED = PatternFill("solid", fgColor="FFF2CC")
+FILL_UNFIXED = PatternFill("solid", fgColor="F4CCCC")
 
 # “处理后的数据”Sheet 中：A=日期，B=油压，C=套压，D=瞬时气量（清洗后）
 COL_DATE = 1
@@ -116,7 +119,10 @@ def _write_raw_sheet(ws, df_raw: pd.DataFrame) -> None:
 
 
 def _write_clean_sheet(ws, df_clean: pd.DataFrame, stats: CleaningStats) -> None:
-    """写入“处理后的数据”Sheet：清洗/插值后的数据 + 插值标记。"""
+    """写入“处理后的数据”Sheet：清洗/插值后的数据 + 插值标记。
+
+    被修改（插值修复）的数据以浅黄色标出，无法修复的空值以浅红色标出。
+    """
     columns = [
         "日期",
         "油压", "套压", "瞬时气量",
@@ -127,16 +133,24 @@ def _write_clean_sheet(ws, df_clean: pd.DataFrame, stats: CleaningStats) -> None
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
         cell.alignment = Alignment(horizontal="center")
+    data_cols = ["油压", "套压", "瞬时气量"]
     for i, row in df_clean.iterrows():
         excel_row = i + 2
         ws.cell(row=excel_row, column=1, value=row["日期"]).number_format = "yyyy-mm-dd hh:mm:ss"
-        for j, col in enumerate(columns[1:], start=2):
-            value = row[col]
-            if col.endswith("_插值标记") and pd.notna(value):
-                value = FLAG_NAMES.get(int(value), str(value))
-            cell = ws.cell(row=excel_row, column=j, value=value)
+        for j, col in enumerate(data_cols, start=2):
+            flag = int(row[f"{col}_插值标记"]) if pd.notna(row[f"{col}_插值标记"]) else FLAG_ORIGINAL
+            cell = ws.cell(row=excel_row, column=j, value=row[col])
             if col == "瞬时气量":
                 cell.number_format = "0.0000"
+            # 插值修复的数据标浅黄色
+            if flag == FLAG_INTERPOLATED:
+                cell.fill = FILL_INTERPOLATED
+            # 插值标记列：插值→浅黄，无法修复→浅红
+            flag_cell = ws.cell(row=excel_row, column=j + 3, value=FLAG_NAMES.get(flag, str(flag)))
+            if flag == FLAG_INTERPOLATED:
+                flag_cell.fill = FILL_INTERPOLATED
+            elif flag == FLAG_UNFIXED:
+                flag_cell.fill = FILL_UNFIXED
     ws.freeze_panes = "A2"
     for j in range(1, len(columns) + 1):
         ws.column_dimensions[get_column_letter(j)].width = 18
@@ -202,6 +216,10 @@ def _build_native_chart(data_ws, df_clean: pd.DataFrame, stats: CleaningStats) -
     chart = chart_left
     chart += chart_right
     _style_legend(chart.legend)
+    # 图表边框：默认黑色
+    chart.graphical_properties = GraphicalProperties(
+        ln=LineProperties(solidFill="000000", w=9525)
+    )
 
     # X 轴：日期格式 + 等时间间隔刻度（6 个，间隔 = 跨度/5）
     tmin, tmax = stats.time_min, stats.time_max
