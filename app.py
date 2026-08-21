@@ -36,9 +36,9 @@ TEMPLATES = {
     },
     "日期叠合曲线模板": {
         "icon": "📅",
-        "status": "coming",
-        "badge": "开发中",
-        "desc": "多口井按日期叠合对比展示，即将上线。",
+        "status": "ready",
+        "badge": "当前可用",
+        "desc": "基于单井生产曲线模板，瞬时气量以面积图展示，其余功能与单井模板一致。",
     },
     "天数叠合曲线模板": {
         "icon": "📆",
@@ -143,8 +143,11 @@ def render_coming_soon(name: str) -> None:
     )
 
 
-def run_single_well_flow(df: pd.DataFrame, well_name: str) -> None:
-    """单井生产曲线模板：数据预览 → 清洗 → 曲线图 → 下载。"""
+def run_single_well_flow(df: pd.DataFrame, well_name: str, gas_area: bool = False) -> None:
+    """单井类模板流程：数据预览 → 清洗 → 曲线图 → 下载。
+
+    gas_area=True 表示日期叠合曲线模板（瞬时气量为面积图）。
+    """
     st.success(f"文件解析成功：井号 {well_name}，共 {len(df)} 条数据")
 
     st.markdown('<div class="section-title">① 数据预览（前 10 行）</div>', unsafe_allow_html=True)
@@ -200,12 +203,12 @@ def run_single_well_flow(df: pd.DataFrame, well_name: str) -> None:
         st.stop()
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
-    fig = plotting.create_chart(df_clean, well_name, stats)
+    fig = plotting.create_chart(df_clean, well_name, stats, gas_area=gas_area)
     st.pyplot(fig)
     plotting.close_fig(fig)
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
-    xlsx_bytes = excel_export.export_excel(df, df_clean, stats, well_name)
+    xlsx_bytes = excel_export.export_excel(df, df_clean, stats, well_name, gas_area=gas_area)
     st.download_button(
         label="下载 Excel 文件（含原始数据 / 处理后的数据 / 图片 三个子表）",
         data=xlsx_bytes,
@@ -240,7 +243,7 @@ def main() -> None:
         st.caption(
             "版本 1.0\n\n"
             "· 单井生产曲线模板：已上线\n"
-            "· 日期叠合曲线模板：开发中\n"
+            "· 日期叠合曲线模板：已上线（瞬时气量面积图）\n"
             "· 天数叠合曲线模板：开发中"
         )
 
@@ -274,7 +277,8 @@ def main() -> None:
             loaded = loader.load_well_data(uploaded)
             df = loaded["data"]
             well_name = loaded["well_name"]
-        run_single_well_flow(df, well_name)
+        gas_area = selected == "日期叠合曲线模板"
+        run_single_well_flow(df, well_name, gas_area=gas_area)
     except loader.LoadError as exc:
         st.error(f"文件格式错误：{exc}")
         logger.error("文件格式错误：%s", exc)
