@@ -43,6 +43,10 @@ COLOR_OIL = "#FF0000"          # 油压：红色
 COLOR_CASING = "#0000FF"       # 套压：蓝色
 COLOR_GAS = "#FFC000"          # 瞬时气量：橙色（与模板一致）
 
+# 图例单位
+UNIT_PRESSURE = "（兆帕）"      # 油压/套压单位
+UNIT_GAS = "（万方/天）"        # 瞬时气量单位
+
 LINEWIDTH_OIL = 1.5            # 油压线宽
 LINEWIDTH_CASING = 1.5         # 套压线宽
 LINEWIDTH_GAS = 1.0            # 瞬时气量线宽
