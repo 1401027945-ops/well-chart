@@ -50,6 +50,8 @@ from .config import (
     TICK_DIRECTION,
     TICK_LABEL_FONT_SIZE,
     TICK_LINE_WIDTH,
+    UNIT_GAS,
+    UNIT_PRESSURE,
     get_logger,
 )
 
@@ -152,9 +154,9 @@ def create_chart(df_clean: pd.DataFrame, well_name: str, stats: CleaningStats) -
     ax2 = ax.twinx()  # 右侧纵轴：瞬时气量
 
     # 三条曲线（对应需求 4.1 的颜色与线宽）
-    ax.plot(times, df_clean["油压"], color=COLOR_OIL, linewidth=LINEWIDTH_OIL, label="油压")
-    ax.plot(times, df_clean["套压"], color=COLOR_CASING, linewidth=LINEWIDTH_CASING, label="套压")
-    ax2.plot(times, df_clean["瞬时气量"], color=COLOR_GAS, linewidth=LINEWIDTH_GAS, label="瞬时气量")
+    ax.plot(times, df_clean["油压"], color=COLOR_OIL, linewidth=LINEWIDTH_OIL, label=f"油压{UNIT_PRESSURE}")
+    ax.plot(times, df_clean["套压"], color=COLOR_CASING, linewidth=LINEWIDTH_CASING, label=f"套压{UNIT_PRESSURE}")
+    ax2.plot(times, df_clean["瞬时气量"], color=COLOR_GAS, linewidth=LINEWIDTH_GAS, label=f"瞬时气量{UNIT_GAS}")
 
     # 纵轴范围
     oil_lo, oil_hi = compute_y_range(df_clean["油压"])
