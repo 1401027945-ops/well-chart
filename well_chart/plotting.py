@@ -143,8 +143,16 @@ def _setup_chinese_fonts() -> None:
     plt.rcParams["axes.unicode_minus"] = False
 
 
-def create_chart(df_clean: pd.DataFrame, well_name: str, stats: CleaningStats) -> plt.Figure:
-    """根据清洗后的数据绘制曲线图，返回 Figure 对象。"""
+def create_chart(
+    df_clean: pd.DataFrame,
+    well_name: str,
+    stats: CleaningStats,
+    gas_area: bool = False,
+) -> plt.Figure:
+    """根据清洗后的数据绘制曲线图，返回 Figure 对象。
+
+    gas_area=True 时（日期叠合曲线模板），瞬时气量以面积图显示。
+    """
     _setup_chinese_fonts()
     times = df_clean["日期"]
     tmin, tmax = times.min(), times.max()
@@ -156,6 +164,9 @@ def create_chart(df_clean: pd.DataFrame, well_name: str, stats: CleaningStats) -
     # 三条曲线（对应需求 4.1 的颜色与线宽）
     ax.plot(times, df_clean["油压"], color=COLOR_OIL, linewidth=LINEWIDTH_OIL, label=f"油压{UNIT_PRESSURE}")
     ax.plot(times, df_clean["套压"], color=COLOR_CASING, linewidth=LINEWIDTH_CASING, label=f"套压{UNIT_PRESSURE}")
+    if gas_area:
+        # 面积图：在折线下填充半透明橙色区域
+        ax2.fill_between(times, df_clean["瞬时气量"], 0, color=COLOR_GAS, alpha=0.35, linewidth=0)
     ax2.plot(times, df_clean["瞬时气量"], color=COLOR_GAS, linewidth=LINEWIDTH_GAS, label=f"瞬时气量{UNIT_GAS}")
 
     # 纵轴范围
