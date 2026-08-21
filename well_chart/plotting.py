@@ -30,6 +30,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 
 from .cleaning import CleaningStats
 from .config import (
@@ -177,6 +178,11 @@ def create_chart(
 
     gas_lo, gas_hi = compute_y_range(df_clean["瞬时气量"])
     ax2.set_ylim(gas_lo, gas_hi)
+
+    # 纵坐标只显示合适的整数刻度，不保留小数
+    for axis in (ax, ax2):
+        axis.yaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
+        axis.yaxis.set_major_formatter(FormatStrFormatter("%d"))
 
     # 瞬时气量全为 0 → 0~1 范围并显示“关井”标注
     gas_all_zero = (
