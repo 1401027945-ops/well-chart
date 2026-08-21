@@ -16,6 +16,7 @@ import math
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.chart import AreaChart, LineChart, Reference, ScatterChart, Series
+from openpyxl.chart.axis import DateAxis
 from openpyxl.chart.marker import Marker
 from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.chart.text import Paragraph, RichText
@@ -232,11 +233,12 @@ def _build_native_chart(
         chart.series.append(ser)
 
     if gas_area:
-        # 日期叠合曲线模板：油压/套压为折线图，瞬时气量为面积图
+        # 日期叠合曲线模板：油压/套压为折线图，瞬时气量为面积图；
+        # 共用真日期轴，横坐标刻度与单井模板完全一致
         chart_left = LineChart()
         chart_left.legend.position = "t"
-        chart_left.x_axis.axId = 10
-        chart_left.x_axis.crossAx = 20
+        chart_left.x_axis = DateAxis(axId=10, crossAx=20)
+        chart_left.x_axis.axPos = "b"
         chart_left.y_axis.axId = 20
         chart_left.y_axis.crossAx = 10
         chart_left.x_axis.majorGridlines = None
@@ -255,8 +257,8 @@ def _build_native_chart(
 
         chart_right = AreaChart()
         chart_right.grouping = "standard"
-        chart_right.x_axis.axId = 10
-        chart_right.x_axis.crossAx = 200
+        chart_right.x_axis = DateAxis(axId=10, crossAx=200)
+        chart_right.x_axis.axPos = "b"
         chart_right.y_axis.axId = 200
         chart_right.y_axis.crossAx = 10
         chart_right.y_axis.axPos = "r"
@@ -282,14 +284,15 @@ def _build_native_chart(
 
         chart = chart_left
         chart += chart_right
-        # 分类轴：约 6 个日期标签
-        skip = max(1, n_rows // 6)
-        chart.x_axis.number_format = "yyyy/m/d"
-        chart.x_axis.tickLblSkip = skip
-        chart.x_axis.tickMarkSkip = skip
-        chart_right.x_axis.number_format = "yyyy/m/d"
-        chart_right.x_axis.tickLblSkip = skip
-        chart_right.x_axis.tickMarkSkip = skip
+        # 与单井模板一致：日期格式 + 等时间间隔刻度（6 个，间隔 = 跨度/5）
+        tmin, tmax = stats.time_min, stats.time_max
+        span_days = (tmax - tmin).total_seconds() / 86400.0
+        for x_axis in (chart.x_axis, chart_right.x_axis):
+            x_axis.number_format = "yyyy/m/d"
+            x_axis.majorUnit = span_days / 5.0
+            x_axis.majorTimeUnit = "days"
+            x_axis.scaling.min = _excel_serial(tmin)
+            x_axis.scaling.max = _excel_serial(tmax)
     else:
         # 单井生产曲线模板：三条均为折线（散点折线，保持真实日期间距）
         chart_left = ScatterChart()
