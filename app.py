@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """生产曲线模板门户 - Streamlit 主程序。
 
-当前提供“单井生产曲线模板”，并预留“日期叠合曲线模板”“天数叠合曲线模板”
-两个后续模板入口。任何人访问网站后上传数据即可自动生成曲线并下载 Excel。
+当前提供“单井生产曲线模板”，并预留“天数叠合曲线模板”后续模板入口。
+任何人访问网站后上传数据即可自动生成曲线并下载 Excel。
 
 启动方式：streamlit run app.py
 """
@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# 模板定义：当前可用 1 个，后续开发 2 个
+# 模板定义：当前可用 1 个，后续开发 1 个
 # ---------------------------------------------------------------------------
 TEMPLATES = {
     "单井生产曲线模板": {
@@ -33,12 +33,6 @@ TEMPLATES = {
         "badge": "当前可用",
         "desc": "上传单井历史数据（日期、油压、套压、瞬时气量），自动清洗异常值、"
                 "修复固定值段，生成双纵轴曲线图，并下载包含数据与图表的 Excel。",
-    },
-    "日期叠合曲线模板": {
-        "icon": "📅",
-        "status": "ready",
-        "badge": "当前可用",
-        "desc": "基于单井生产曲线模板，瞬时气量以面积图展示，其余功能与单井模板一致。",
     },
     "天数叠合曲线模板": {
         "icon": "📆",
@@ -147,12 +141,8 @@ def run_single_well_flow(
     df: pd.DataFrame,
     well_name: str,
     template_name: str,
-    gas_area: bool = False,
 ) -> None:
-    """单井类模板流程：数据预览 → 清洗 → 曲线图 → 下载。
-
-    gas_area=True 表示日期叠合曲线模板（瞬时气量为面积图）。
-    """
+    """单井生产曲线模板流程：数据预览 → 清洗 → 曲线图 → 下载。"""
     st.success(f"文件解析成功：井号 {well_name}，共 {len(df)} 条数据")
 
     st.markdown('<div class="section-title">① 数据预览（前 10 行）</div>', unsafe_allow_html=True)
@@ -208,14 +198,13 @@ def run_single_well_flow(
         st.stop()
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
-    fig = plotting.create_chart(df_clean, well_name, stats, gas_area=gas_area)
+    fig = plotting.create_chart(df_clean, well_name, stats)
     st.pyplot(fig)
     plotting.close_fig(fig)
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
     xlsx_bytes = excel_export.export_excel(
-        df, df_clean, stats, well_name,
-        template_name=template_name, gas_area=gas_area,
+        df, df_clean, stats, well_name, template_name=template_name,
     )
     file_name = f"{well_name}_{template_name.replace('模板', '')}.xlsx"
     st.download_button(
@@ -252,7 +241,6 @@ def main() -> None:
         st.caption(
             f"版本 {APP_VERSION}\n\n"
             "· 单井生产曲线模板：已上线\n"
-            "· 日期叠合曲线模板：已上线（瞬时气量面积图）\n"
             "· 天数叠合曲线模板：开发中"
         )
 
@@ -286,8 +274,7 @@ def main() -> None:
             loaded = loader.load_well_data(uploaded)
             df = loaded["data"]
             well_name = loaded["well_name"]
-        gas_area = selected == "日期叠合曲线模板"
-        run_single_well_flow(df, well_name, selected, gas_area=gas_area)
+        run_single_well_flow(df, well_name, selected)
     except loader.LoadError as exc:
         st.error(f"文件格式错误：{exc}")
         logger.error("文件格式错误：%s", exc)
