@@ -17,6 +17,7 @@ from well_chart.days_aligned import (
     ColumnDetector,
     DaysAlignedProcessor,
     DaysExcelExporter,
+    build_aligned_df,
     build_std_df,
     preview_figure,
 )
@@ -233,6 +234,10 @@ def run_days_flow(uploaded) -> None:
         header_row = loader._find_header_row(raw)
         file_name = getattr(uploaded, "name", "upload.xlsx") or "upload.xlsx"
         well_name = loader.extract_well_name(raw, header_row, sheet_name, file_name)
+        aligned_cols = ColumnDetector.detect_aligned(raw, header_row)
+        if aligned_cols is not None:
+            run_days_process(raw, header_row, aligned_cols, well_name, aligned_mode=True)
+            return
         cols = ColumnDetector.detect(raw, header_row)
         if cols is None:
             st.warning("未能自动识别四列（日期/油压/套压/瞬时气量），请手动选择后继续。")
@@ -279,11 +284,21 @@ def render_days_manual_selection(raw: pd.DataFrame, header_row: int, well_name: 
     st.stop()
 
 
-def run_days_process(raw: pd.DataFrame, header_row: int, cols: dict, well_name: str) -> None:
+def run_days_process(
+    raw: pd.DataFrame,
+    header_row: int,
+    cols: dict,
+    well_name: str,
+    aligned_mode: bool = False,
+) -> None:
     """天数叠合模板处理主流程：清洗 → 时间拉齐 → 预览 → 下载。"""
     with st.spinner("正在清洗数据并按生产天数拉齐..."):
-        df_std, log = build_std_df(raw, header_row, cols)
-        processor = DaysAlignedProcessor(df_std, well_name, log)
+        if aligned_mode:
+            df_aligned, log = build_aligned_df(raw, header_row, cols)
+            processor = DaysAlignedProcessor(df_aligned, well_name, log, pre_aligned=True)
+        else:
+            df_std, log = build_std_df(raw, header_row, cols)
+            processor = DaysAlignedProcessor(df_std, well_name, log)
         aligned, log_df, stats = processor.run()
 
     st.success(f"处理完成：井号 {well_name}，共 {stats['days']} 个生产天数")

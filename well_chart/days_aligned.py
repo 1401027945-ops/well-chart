@@ -129,6 +129,39 @@ class ColumnDetector:
             return result
         return None
 
+    @staticmethod
+    def detect_aligned(raw: pd.DataFrame, header_row: int) -> dict | None:
+        """识别“时间拉齐”格式的数据源。
+
+        识别规则（关键词）：
+        - 天数：包含“天”；
+        - 平均套压(兆帕)：包含“套”；
+        - 平均油压(兆帕)：包含“油”；
+        - 平均日产气(万方)：包含“气”。
+        全部识别成功返回 {day, casing, oil, gas}，否则返回 None。
+        """
+        result: dict[str, int] = {}
+        for i in range(max(0, header_row - 2), header_row + 1):
+            for j in range(raw.shape[1]):
+                text = ColumnDetector._norm(raw.iat[i, j])
+                if not text:
+                    continue
+                kind = None
+                if "天" in text:
+                    kind = "day"
+                elif "套" in text:
+                    kind = "casing"
+                elif "油" in text:
+                    kind = "oil"
+                elif "气" in text:
+                    kind = "gas"
+                if kind is not None and kind not in result:
+                    result[kind] = j
+        if all(k in result for k in ("day", "casing", "oil", "gas")):
+            logger.info("时间拉齐格式识别成功：%s", result)
+            return result
+        return None
+
 
 def build_std_df(raw: pd.DataFrame, header_row: int, cols: dict) -> tuple[pd.DataFrame, CleaningLog]:
     """按识别出的列构建标准化 DataFrame（日期/油压/套压/瞬时气量）。
@@ -152,6 +185,33 @@ def build_std_df(raw: pd.DataFrame, header_row: int, cols: dict) -> tuple[pd.Dat
     df = df.sort_values("日期").reset_index(drop=True)
     if df.empty:
         raise ValueError("解析后没有有效数据（日期列均无法解析）。")
+    return df, log
+
+
+def build_aligned_df(raw: pd.DataFrame, header_row: int, cols: dict) -> tuple[pd.DataFrame, CleaningLog]:
+    """读取已为“时间拉齐”格式的数据源（天数/平均套压/平均油压/平均日产气）。
+
+    天数无法解析的行会被跳过并记录日志，数值统一保留 4 位小数。
+    """
+    log = CleaningLog()
+    data = raw.iloc[header_row + 1:].copy()
+    df = pd.DataFrame(
+        {
+            "天数": pd.to_numeric(data.iloc[:, cols["day"]], errors="coerce"),
+            "平均套压": pd.to_numeric(data.iloc[:, cols["casing"]], errors="coerce"),
+            "平均油压": pd.to_numeric(data.iloc[:, cols["oil"]], errors="coerce"),
+            "平均日产气": pd.to_numeric(data.iloc[:, cols["gas"]], errors="coerce"),
+        }
+    )
+    bad_days = df["天数"].isna()
+    if bad_days.any():
+        log.add("数据识别", f"{int(bad_days.sum())} 行天数无法解析，已跳过")
+        df = df[~bad_days]
+    df = df.sort_values("天数").reset_index(drop=True)
+    df[["平均套压", "平均油压", "平均日产气"]] = df[["平均套压", "平均油压", "平均日产气"]].round(4)
+    if df.empty:
+        raise ValueError("解析后没有有效数据（天数列均无法解析）。")
+    log.add("数据识别", "文件已为“时间拉齐”格式（天数/平均套压/平均油压/平均日产气），直接作为数据源使用")
     return df, log
 
 
@@ -310,13 +370,31 @@ class TimeAligner:
 class DaysAlignedProcessor:
     """第二模块主流程：采样 → 清洗 → 时间拉齐。"""
 
-    def __init__(self, df: pd.DataFrame, well_name: str = "未知井号", log: CleaningLog | None = None):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        well_name: str = "未知井号",
+        log: CleaningLog | None = None,
+        pre_aligned: bool = False,
+    ):
         self.df = df
         self.well_name = well_name
         self.log = log if log is not None else CleaningLog()
+        self.pre_aligned = pre_aligned
 
     def run(self) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         """执行完整流程，返回 (时间拉齐数据, 清洗日志, 统计信息)。"""
+        if self.pre_aligned:
+            aligned = self.df[["天数", "平均套压", "平均油压", "平均日产气"]].round(4).reset_index(drop=True)
+            self.log.add("数据识别", "数据源已为时间拉齐格式，跳过清洗与拉齐，直接出图")
+            stats = {
+                "days": len(aligned),
+                "raw_rows": len(aligned),
+                "log_count": len(self.log.records),
+                "well_name": self.well_name,
+            }
+            logger.info("时间拉齐数据直接使用：共 %d 天", stats["days"])
+            return aligned, self.log.to_dataframe(), stats
         df = self._sample_if_needed(self.df)
         df = DataCleaner(self.log).clean(df)
         aligned = TimeAligner.align(df)
