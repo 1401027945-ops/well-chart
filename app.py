@@ -210,7 +210,11 @@ def run_single_well_flow(
     xlsx_bytes = excel_export.export_excel(
         df, df_clean, stats, well_name, template_name=template_name,
     )
-    preview_png, render_note = chart_render.render_native_chart(xlsx_bytes)
+    render_result = chart_render.render_native_chart(xlsx_bytes)
+    if isinstance(render_result, tuple):
+        preview_png, render_note = render_result
+    else:
+        preview_png, render_note = render_result, ""
     if preview_png:
         st.image(preview_png)
         st.caption("预览为下载结果中「图片」子表的原生图表，打开 Excel 后可双击编辑。")
@@ -329,7 +333,11 @@ def run_days_process(
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
     xlsx_bytes = DaysExcelExporter().export(aligned, log_df, well_name)
-    preview_png, render_note = chart_render.render_native_chart(xlsx_bytes)
+    render_result = chart_render.render_native_chart(xlsx_bytes)
+    if isinstance(render_result, tuple):
+        preview_png, render_note = render_result
+    else:
+        preview_png, render_note = render_result, ""
     if preview_png:
         st.image(preview_png)
         st.caption("预览为下载结果中「曲线图」子表的原生图表，打开 Excel 后可双击编辑。")
