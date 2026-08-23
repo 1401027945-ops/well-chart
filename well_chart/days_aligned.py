@@ -438,6 +438,15 @@ def tick_positions(n: int, num_ticks: int = MOD2_X_TICKS) -> list:
     return out
 
 
+def y_major_step(max_val: float) -> float:
+    """根据纵轴最大值计算主刻度步长，使刻度节点控制在 4~6 个。"""
+    if max_val <= 0:
+        return 1.0
+    step = max_val / 5.0
+    # 向上取整到 1 位小数，保证刻度数不超过 6
+    return math.ceil(step * 10) / 10.0
+
+
 def preview_figure(aligned: pd.DataFrame):
     """生成网页预览图（仅界面展示用；下载的 Excel 使用原生图表）。"""
     import matplotlib.pyplot as plt
@@ -459,10 +468,12 @@ def preview_figure(aligned: pd.DataFrame):
     ax.set_xlim(1, max(1, len(aligned)))
     ax.grid(False)
     ax2.grid(False)
-    from matplotlib.ticker import FormatStrFormatter
+    from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 
     ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
     ax2.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    ax2.yaxis.set_major_locator(MaxNLocator(nbins=5))
 
     lines = ax.get_lines() + ax2.get_lines()
     labels = [line.get_label() for line in lines]
@@ -548,9 +559,11 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     chart_left.y_axis.scaling.min = 0
     chart_left.y_axis.scaling.max = max(1, math.ceil(pressure_max * 1.1))
     chart_left.y_axis.number_format = MOD2_Y_FORMAT
+    chart_left.y_axis.majorUnit = y_major_step(chart_left.y_axis.scaling.max)
     chart_right.y_axis.scaling.min = 0
     chart_right.y_axis.scaling.max = max(1, math.ceil(gas_max * 1.15))
     chart_right.y_axis.number_format = MOD2_Y_FORMAT
+    chart_right.y_axis.majorUnit = y_major_step(chart_right.y_axis.scaling.max)
 
     # 图例：顶部居中、单行、无边框、字体大 2 号
     chart.legend.position = "t"
