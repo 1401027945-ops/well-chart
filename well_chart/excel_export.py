@@ -96,6 +96,16 @@ def _style_legend(legend) -> None:
     )
 
 
+def _vertical_title(axis) -> None:
+    """纵轴标题文字方向：竖排（从右到左）。"""
+    if axis.title is not None and getattr(axis.title, "tx", None) is not None:
+        rich = getattr(axis.title.tx, "rich", None)
+        if rich is not None and rich.bodyPr is not None:
+            rich.bodyPr.vert = "eaVert"
+            rich.bodyPr.rtlCol = True
+            rich.bodyPr.rot = 0
+
+
 def _write_raw_sheet(ws, df_raw: pd.DataFrame) -> None:
     """写入“原始数据”Sheet：文件中的原始数据，不做任何清洗。"""
     columns = ["日期", "油压", "套压", "瞬时气量"]
@@ -237,6 +247,7 @@ def _build_native_chart(
     add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
     _style_axis(chart_left.x_axis)
     _style_axis(chart_left.y_axis)
+    _vertical_title(chart_left.y_axis)
     chart_left.y_axis.scaling.min = left_top[0]
     chart_left.y_axis.scaling.max = left_top[1]
     chart_left.y_axis.majorUnit = left_top[2]
@@ -255,6 +266,7 @@ def _build_native_chart(
     add_series(chart_right, COL_GAS, f"瞬时气量{UNIT_GAS}", COLOR_GAS, LINEWIDTH_GAS)
     _style_axis(chart_right.x_axis)
     _style_axis(chart_right.y_axis)
+    _vertical_title(chart_right.y_axis)
     chart_right.y_axis.scaling.min = right_top[0]
     chart_right.y_axis.scaling.max = right_top[1]
     chart_right.y_axis.majorUnit = right_top[2]
