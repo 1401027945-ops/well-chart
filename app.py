@@ -210,7 +210,7 @@ def run_single_well_flow(
     xlsx_bytes = excel_export.export_excel(
         df, df_clean, stats, well_name, template_name=template_name,
     )
-    preview_png = chart_render.render_native_chart(xlsx_bytes)
+    preview_png, render_note = chart_render.render_native_chart(xlsx_bytes)
     if preview_png:
         st.image(preview_png)
         st.caption("预览为下载结果中「图片」子表的原生图表，打开 Excel 后可双击编辑。")
@@ -218,7 +218,7 @@ def run_single_well_flow(
         fig = plotting.create_chart(df_clean, well_name, stats)
         st.pyplot(fig)
         plotting.close_fig(fig)
-        st.caption("当前环境无法渲染原生图表，以上为近似预览；下载的 Excel 中为原生图表。")
+        st.caption(f"当前环境无法渲染原生图表（{render_note}），以上为近似预览；下载的 Excel 中为原生图表。")
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
     file_name = f"{well_name}_{template_name.replace('模板', '')}.xlsx"
@@ -329,7 +329,7 @@ def run_days_process(
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
     xlsx_bytes = DaysExcelExporter().export(aligned, log_df, well_name)
-    preview_png = chart_render.render_native_chart(xlsx_bytes)
+    preview_png, render_note = chart_render.render_native_chart(xlsx_bytes)
     if preview_png:
         st.image(preview_png)
         st.caption("预览为下载结果中「曲线图」子表的原生图表，打开 Excel 后可双击编辑。")
@@ -337,7 +337,7 @@ def run_days_process(
         fig = preview_figure(aligned)
         st.pyplot(fig)
         plotting.close_fig(fig)
-        st.caption("当前环境无法渲染原生图表，以上为近似预览；下载的 Excel 中为原生图表。")
+        st.caption(f"当前环境无法渲染原生图表（{render_note}），以上为近似预览；下载的 Excel 中为原生图表。")
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
     st.download_button(
