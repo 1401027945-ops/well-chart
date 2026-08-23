@@ -10,7 +10,7 @@ import logging
 # 日志
 # ---------------------------------------------------------------------------
 LOGGER_NAME = "well_chart"
-APP_VERSION = "v1.0.6"   # 页面显示的版本号，用于确认部署是否已更新
+APP_VERSION = "v1.0.11"  # 页面显示的版本号，用于确认部署是否已更新
 
 
 def get_logger() -> logging.Logger:
@@ -58,7 +58,7 @@ GRID_LINESTYLE = "--"          # 网格线型：虚线
 
 LABEL_FONT_SIZE = 9            # 坐标轴标签字号（7-9 号取 9）
 TICK_LABEL_FONT_SIZE = 8       # 刻度文字字号（7-9 号取 8）
-LEGEND_FONT_SIZE = 11          # 图例字号（比正文大 2 个字号：9 → 11）
+LEGEND_FONT_SIZE = 10          # 图例字号（比坐标轴标签大 1 个字号：9 → 10）
 TITLE_FONT_SIZE = 15           # 图标题字号（当前不使用）
 NUM_TICKS = 6                  # 时间轴固定刻度数量
 

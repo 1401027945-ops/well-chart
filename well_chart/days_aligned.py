@@ -477,7 +477,7 @@ def preview_figure(aligned: pd.DataFrame):
 
     lines = ax.get_lines() + ax2.get_lines()
     labels = [line.get_label() for line in lines]
-    ax.legend(lines, labels, loc="upper center", ncol=3, frameon=False)
+    ax.legend(lines, labels, loc="upper center", ncol=3, frameon=False, fontsize=10)
     ax.spines["top"].set_visible(False)
     ax2.spines["top"].set_visible(False)
     fig.tight_layout()
@@ -566,7 +566,7 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     chart_right.y_axis.number_format = MOD2_Y_FORMAT
     chart_right.y_axis.majorUnit = y_major_step(chart_right.y_axis.scaling.max)
 
-    # 图例：顶部居中、单行、无边框、字体大 2 号
+    # 图例：顶部居中、单行、无边框、字体比坐标轴大 1 号
     chart.legend.position = "t"
     chart.legend.spPr = GraphicalProperties(noFill=True, ln=LineProperties(noFill=True))
     _style_legend(chart.legend)

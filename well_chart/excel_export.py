@@ -51,18 +51,23 @@ COL_OIL = 2
 COL_CASING = 3
 COL_GAS = 4
 
-# 图表字体与字号（方正大黑简体，7-9 号；图例大 2 个字号）
+# 图表字体与字号（方正大黑简体，7-9 号；图例大 1 个字号）
 CHART_FONT = FONT_NAME
 AXIS_TITLE_FONT_SIZE = 900    # 9pt（DrawingML 单位为百分之一磅）
 TICK_LABEL_FONT_SIZE = 800    # 8pt
-LEGEND_FONT_SIZE = 1100       # 11pt
+LEGEND_FONT_SIZE = 1000       # 10pt（比坐标轴标签大 1 号）
 AXIS_LINE_WIDTH_EMU = 6350    # 0.5 磅 = 6350 EMU
 
 
-def _char_props(size: int, font_name: str = CHART_FONT) -> CharacterProperties:
-    """构造字符属性：指定字体与字号。"""
+def _char_props(
+    size: int,
+    font_name: str = CHART_FONT,
+    bold: bool | None = None,
+) -> CharacterProperties:
+    """构造字符属性：指定字体、字号，可显式控制是否加粗。"""
     return CharacterProperties(
         sz=size,
+        b=bold,
         latin=XLFont(typeface=font_name),
         ea=XLFont(typeface=font_name),
         cs=XLFont(typeface=font_name),
@@ -81,14 +86,15 @@ def _style_axis(axis) -> None:
         rich = getattr(axis.title.tx, "rich", None)
         if rich is not None:
             for p in rich.p:
-                p.pPr = ParagraphProperties(defRPr=_char_props(AXIS_TITLE_FONT_SIZE))
-                p.endParaRPr = _char_props(AXIS_TITLE_FONT_SIZE)
+                # 纵轴标题不设置加粗（b=0），与普通字体保持一致
+                p.pPr = ParagraphProperties(defRPr=_char_props(AXIS_TITLE_FONT_SIZE, bold=False))
+                p.endParaRPr = _char_props(AXIS_TITLE_FONT_SIZE, bold=False)
                 for r in p.r:
-                    r.rPr = _char_props(AXIS_TITLE_FONT_SIZE)
+                    r.rPr = _char_props(AXIS_TITLE_FONT_SIZE, bold=False)
 
 
 def _style_legend(legend) -> None:
-    """设置图例字体：比正文大 2 个字号（11 号）。"""
+    """设置图例字体：比坐标轴标签大 1 个字号（10 号）。"""
     legend.txPr = RichText(
         p=[Paragraph(pPr=ParagraphProperties(defRPr=_char_props(LEGEND_FONT_SIZE)))]
     )
