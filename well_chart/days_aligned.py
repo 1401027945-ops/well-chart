@@ -46,6 +46,7 @@ from .config import (
     MOD2_NEG_OIL_FACTOR,
     MOD2_SAMPLE_ROWS,
     MOD2_X_TICKS,
+    MOD2_Y_FORMAT,
     get_logger,
 )
 from .excel_export import _style_axis, _style_legend
@@ -458,6 +459,10 @@ def preview_figure(aligned: pd.DataFrame):
     ax.set_xlim(1, max(1, len(aligned)))
     ax.grid(False)
     ax2.grid(False)
+    from matplotlib.ticker import FormatStrFormatter
+
+    ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+    ax2.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 
     lines = ax.get_lines() + ax2.get_lines()
     labels = [line.get_label() for line in lines]
@@ -488,11 +493,12 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
         chart.series.append(ser)
 
     def vertical_title(axis) -> None:
-        """纵轴标题竖排：从上往下读（与模板一致）。"""
+        """纵轴标题：顺时针旋转 90°，从上往下读。"""
         if axis.title is not None and getattr(axis.title, "tx", None) is not None:
             rich = getattr(axis.title.tx, "rich", None)
             if rich is not None and rich.bodyPr is not None:
-                rich.bodyPr.vert = "eaVert"
+                rich.bodyPr.rot = 5400000   # 顺时针 90°（单位：1/60000 度）
+                rich.bodyPr.vert = "horz"
 
     # 左轴图表：平均套压 + 平均油压（压力）
     chart_left = LineChart()
@@ -541,10 +547,10 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     gas_max = float(aligned["平均日产气"].max())
     chart_left.y_axis.scaling.min = 0
     chart_left.y_axis.scaling.max = max(1, math.ceil(pressure_max * 1.1))
-    chart_left.y_axis.number_format = "0.00"
+    chart_left.y_axis.number_format = MOD2_Y_FORMAT
     chart_right.y_axis.scaling.min = 0
     chart_right.y_axis.scaling.max = max(1, math.ceil(gas_max * 1.15))
-    chart_right.y_axis.number_format = "0.00"
+    chart_right.y_axis.number_format = MOD2_Y_FORMAT
 
     # 图例：顶部居中、单行、无边框、字体大 2 号
     chart.legend.position = "t"

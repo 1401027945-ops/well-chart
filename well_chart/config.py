@@ -110,6 +110,7 @@ MOD2_LINEWIDTH = 2.25           # 三条曲线线宽
 # 图表尺寸（厘米）
 MOD2_CHART_WIDTH = 15.0
 MOD2_CHART_HEIGHT = 8.0
+MOD2_Y_FORMAT = "0.0"           # 纵坐标数值格式：保留 1 位小数
 
 # 横坐标固定刻度数
 MOD2_X_TICKS = 6
