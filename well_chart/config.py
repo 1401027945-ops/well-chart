@@ -102,9 +102,9 @@ MOD2_MAX_ROWS = 10000           # 超过该行数触发采样
 MOD2_SAMPLE_ROWS = 5000         # 采样后的目标行数
 
 # 图表颜色与线宽（单位：磅）
-MOD2_COLOR_CASING = "#FF0000"   # 平均套压：红色
-MOD2_COLOR_OIL = "#0070C0"      # 平均油压：蓝色
-MOD2_COLOR_GAS = "#ED7D31"      # 平均日产气：橙色
+MOD2_COLOR_CASING = "#FF0000"   # 平均套压：红色 255,0,0
+MOD2_COLOR_OIL = "#0000FF"      # 平均油压：蓝色 0,0,255
+MOD2_COLOR_GAS = "#FFC000"      # 平均日产气：橙色 255,192,0
 MOD2_LINEWIDTH = 2.25           # 三条曲线线宽
 
 # 图表尺寸（厘米）

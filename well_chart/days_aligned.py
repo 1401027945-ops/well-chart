@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.chart import LineChart, Reference
+from openpyxl.chart import LineChart, Reference, Series
 from openpyxl.chart.axis import NumericAxis
 from openpyxl.chart.marker import Marker
 from openpyxl.chart.shapes import GraphicalProperties
@@ -447,9 +447,9 @@ def preview_figure(aligned: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(10, 4.8), dpi=100, facecolor="white")
     ax2 = ax.twinx()
     x = aligned["天数"]
-    ax.plot(x, aligned["平均套压"], color=MOD2_COLOR_CASING, linewidth=1.2, label="平均套压（兆帕）")
-    ax.plot(x, aligned["平均油压"], color=MOD2_COLOR_OIL, linewidth=1.2, label="平均油压（兆帕）")
-    ax2.plot(x, aligned["平均日产气"], color=MOD2_COLOR_GAS, linewidth=1.2, label="平均日产气（万方）")
+    ax.plot(x, aligned["平均套压"], color=MOD2_COLOR_CASING, linewidth=1.2, label="平均套压")
+    ax.plot(x, aligned["平均油压"], color=MOD2_COLOR_OIL, linewidth=1.2, label="平均油压")
+    ax2.plot(x, aligned["平均日产气"], color=MOD2_COLOR_GAS, linewidth=1.2, label="平均日产气")
 
     ax.set_xlabel("天数")
     ax.set_ylabel("压力（MPa）")
@@ -477,15 +477,22 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     x_ref = Reference(data_ws, min_col=1, min_row=2, max_row=n + 1)
     width_emu = int(MOD2_LINEWIDTH * 12700)  # 2.25 磅
 
-    def add_series(chart: LineChart, col: int, color_hex: str) -> None:
-        """向折线图添加一条带样式的序列（表头行作为系列名）。"""
-        ref = Reference(data_ws, min_col=col, min_row=1, max_row=n + 1)
-        chart.add_data(ref, titles_from_data=True)
-        ser = chart.series[-1]
+    def add_series(chart: LineChart, col: int, title: str, color_hex: str) -> None:
+        """向折线图添加一条带样式的序列（图例不带单位，只显示名称）。"""
+        ref = Reference(data_ws, min_col=col, min_row=2, max_row=n + 1)
+        ser = Series(ref, title=title)
         ser.marker = Marker(symbol="none")
         ser.graphicalProperties = GraphicalProperties(
             ln=LineProperties(solidFill=color_hex.lstrip("#"), w=width_emu)
         )
+        chart.series.append(ser)
+
+    def vertical_title(axis) -> None:
+        """纵轴标题竖排：从上往下读（与模板一致）。"""
+        if axis.title is not None and getattr(axis.title, "tx", None) is not None:
+            rich = getattr(axis.title.tx, "rich", None)
+            if rich is not None and rich.bodyPr is not None:
+                rich.bodyPr.vert = "eaVert"
 
     # 左轴图表：平均套压 + 平均油压（压力）
     chart_left = LineChart()
@@ -494,12 +501,13 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     chart_left.y_axis.axId = 20
     chart_left.y_axis.crossAx = 10
     chart_left.y_axis.majorGridlines = None
-    chart_left.y_axis.title = "压力（MPa）"
-    add_series(chart_left, 2, MOD2_COLOR_CASING)
-    add_series(chart_left, 3, MOD2_COLOR_OIL)
+    chart_left.y_axis.title = "压力（兆帕）"
+    add_series(chart_left, 2, "平均套压", MOD2_COLOR_CASING)
+    add_series(chart_left, 3, "平均油压", MOD2_COLOR_OIL)
     chart_left.set_categories(x_ref)
     _style_axis(chart_left.x_axis)
     _style_axis(chart_left.y_axis)
+    vertical_title(chart_left.y_axis)
 
     # 右轴图表：平均日产气（产量，独立右纵轴）
     chart_right = LineChart()
@@ -511,10 +519,11 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     chart_right.y_axis.crosses = "max"
     chart_right.y_axis.majorGridlines = None
     chart_right.y_axis.title = "日产气（万方）"
-    add_series(chart_right, 4, MOD2_COLOR_GAS)
+    add_series(chart_right, 4, "平均日产气", MOD2_COLOR_GAS)
     chart_right.set_categories(x_ref)
     _style_axis(chart_right.x_axis)
     _style_axis(chart_right.y_axis)
+    vertical_title(chart_right.y_axis)
 
     chart = chart_left
     chart += chart_right
@@ -532,8 +541,10 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     gas_max = float(aligned["平均日产气"].max())
     chart_left.y_axis.scaling.min = 0
     chart_left.y_axis.scaling.max = max(1, math.ceil(pressure_max * 1.1))
+    chart_left.y_axis.number_format = "0.00"
     chart_right.y_axis.scaling.min = 0
     chart_right.y_axis.scaling.max = max(1, math.ceil(gas_max * 1.15))
+    chart_right.y_axis.number_format = "0.00"
 
     # 图例：顶部居中、单行、无边框、字体大 2 号
     chart.legend.position = "t"
