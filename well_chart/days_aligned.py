@@ -516,9 +516,12 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     chart_left = LineChart()
     chart_left.x_axis = NumericAxis(axId=10, crossAx=20)
     chart_left.x_axis.axPos = "b"
+    chart_left.x_axis.majorGridlines = None
+    chart_left.x_axis.minorGridlines = None
     chart_left.y_axis.axId = 20
     chart_left.y_axis.crossAx = 10
     chart_left.y_axis.majorGridlines = None
+    chart_left.y_axis.minorGridlines = None
     chart_left.y_axis.title = "压力（兆帕）"
     add_series(chart_left, 2, "平均套压", MOD2_COLOR_CASING)
     add_series(chart_left, 3, "平均油压", MOD2_COLOR_OIL)
@@ -531,11 +534,14 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
     chart_right = LineChart()
     chart_right.x_axis.axId = 10
     chart_right.x_axis.crossAx = 200
+    chart_right.x_axis.majorGridlines = None
+    chart_right.x_axis.minorGridlines = None
     chart_right.y_axis.axId = 200
     chart_right.y_axis.crossAx = 10
     chart_right.y_axis.axPos = "r"
     chart_right.y_axis.crosses = "max"
     chart_right.y_axis.majorGridlines = None
+    chart_right.y_axis.minorGridlines = None
     chart_right.y_axis.title = "日产气（万方）"
     add_series(chart_right, 4, "平均日产气", MOD2_COLOR_GAS)
     chart_right.set_categories(x_ref)
