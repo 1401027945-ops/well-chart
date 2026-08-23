@@ -6,3 +6,4 @@ openpyxl>=3.1
 xlsxwriter>=3.1
 numpy>=1.24
 xlrd>=2.0
+pywin32>=306; sys_platform == "win32"

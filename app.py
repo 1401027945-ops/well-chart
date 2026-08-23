@@ -12,7 +12,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from well_chart import cleaning, days_aligned, excel_export, loader, plotting
+from well_chart import chart_render, cleaning, days_aligned, excel_export, loader, plotting
 from well_chart.days_aligned import (
     ColumnDetector,
     DaysAlignedProcessor,
@@ -207,14 +207,20 @@ def run_single_well_flow(
         st.stop()
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
-    fig = plotting.create_chart(df_clean, well_name, stats)
-    st.pyplot(fig)
-    plotting.close_fig(fig)
-
-    st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
     xlsx_bytes = excel_export.export_excel(
         df, df_clean, stats, well_name, template_name=template_name,
     )
+    preview_png = chart_render.render_native_chart(xlsx_bytes)
+    if preview_png:
+        st.image(preview_png)
+        st.caption("预览为下载结果中「图片」子表的原生图表，打开 Excel 后可双击编辑。")
+    else:
+        fig = plotting.create_chart(df_clean, well_name, stats)
+        st.pyplot(fig)
+        plotting.close_fig(fig)
+        st.caption("当前环境无法渲染原生图表，以上为近似预览；下载的 Excel 中为原生图表。")
+
+    st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
     file_name = f"{well_name}_{template_name.replace('模板', '')}.xlsx"
     st.download_button(
         label=f"下载「{template_name}」Excel 文件（含原始数据 / 处理后的数据 / 图片 三个子表）",
@@ -322,12 +328,18 @@ def run_days_process(
             st.warning(f"{row['类别']}：{row['说明']}")
 
     st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
-    fig = preview_figure(aligned)
-    st.pyplot(fig)
-    plotting.close_fig(fig)
+    xlsx_bytes = DaysExcelExporter().export(aligned, log_df, well_name)
+    preview_png = chart_render.render_native_chart(xlsx_bytes)
+    if preview_png:
+        st.image(preview_png)
+        st.caption("预览为下载结果中「曲线图」子表的原生图表，打开 Excel 后可双击编辑。")
+    else:
+        fig = preview_figure(aligned)
+        st.pyplot(fig)
+        plotting.close_fig(fig)
+        st.caption("当前环境无法渲染原生图表，以上为近似预览；下载的 Excel 中为原生图表。")
 
     st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
-    xlsx_bytes = DaysExcelExporter().export(aligned, log_df, well_name)
     st.download_button(
         label="下载 Excel 文件（时间拉齐数据 / 清洗日志 / 曲线图）",
         data=xlsx_bytes,
