@@ -33,8 +33,6 @@ from .config import (
     LINEWIDTH_CASING,
     LINEWIDTH_GAS,
     LINEWIDTH_OIL,
-    UNIT_GAS,
-    UNIT_PRESSURE,
     get_logger,
 )
 
@@ -185,13 +183,16 @@ def _excel_serial(ts: pd.Timestamp) -> float:
 
 
 def _integer_step(value_range: float) -> int:
-    """为纵轴选择“合适的整数”刻度步长（1/2/5×10^n）。"""
+    """为纵轴选择整数刻度步长，使刻度节点控制在 4~6 个。
+
+    取“不小于 最大值/5”的最小 1/2/5×10^n 整数步长，保证刻度不超过 6 个。
+    """
     if value_range <= 0:
         return 1
     ideal = value_range / 5.0
-    exp = 10 ** math.floor(math.log10(ideal))
+    exp = 10 ** math.floor(math.log10(max(ideal, 1e-9)))
     for m in (1, 2, 5, 10):
-        if ideal <= m * exp:
+        if m * exp >= ideal:
             return int(m * exp)
     return int(10 * exp)
 
@@ -243,8 +244,8 @@ def _build_native_chart(
     chart_left.x_axis.majorGridlines = None
     chart_left.y_axis.majorGridlines = None
     chart_left.y_axis.title = "压力（MPa）"
-    add_series(chart_left, COL_OIL, f"油压{UNIT_PRESSURE}", COLOR_OIL, LINEWIDTH_OIL)
-    add_series(chart_left, COL_CASING, f"套压{UNIT_PRESSURE}", COLOR_CASING, LINEWIDTH_CASING)
+    add_series(chart_left, COL_OIL, "油压", COLOR_OIL, LINEWIDTH_OIL)
+    add_series(chart_left, COL_CASING, "套压", COLOR_CASING, LINEWIDTH_CASING)
     _style_axis(chart_left.x_axis)
     _style_axis(chart_left.y_axis)
     _vertical_title(chart_left.y_axis)
@@ -263,7 +264,7 @@ def _build_native_chart(
     chart_right.y_axis.crosses = "max"
     chart_right.y_axis.majorGridlines = None
     chart_right.y_axis.title = "瞬时气量（万方/天）"
-    add_series(chart_right, COL_GAS, f"瞬时气量{UNIT_GAS}", COLOR_GAS, LINEWIDTH_GAS)
+    add_series(chart_right, COL_GAS, "瞬时气量", COLOR_GAS, LINEWIDTH_GAS)
     _style_axis(chart_right.x_axis)
     _style_axis(chart_right.y_axis)
     _vertical_title(chart_right.y_axis)
