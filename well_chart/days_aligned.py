@@ -504,12 +504,13 @@ def build_native_chart(data_ws, aligned: pd.DataFrame) -> LineChart:
         chart.series.append(ser)
 
     def vertical_title(axis) -> None:
-        """纵轴标题：顺时针旋转 90°，从上往下读。"""
+        """纵轴标题：竖排（从右到左）。"""
         if axis.title is not None and getattr(axis.title, "tx", None) is not None:
             rich = getattr(axis.title.tx, "rich", None)
             if rich is not None and rich.bodyPr is not None:
-                rich.bodyPr.rot = 5400000   # 顺时针 90°（单位：1/60000 度）
-                rich.bodyPr.vert = "horz"
+                rich.bodyPr.vert = "eaVert"   # 竖排（East Asian 竖排）
+                rich.bodyPr.rtlCol = True     # 从右到左
+                rich.bodyPr.rot = 0
 
     # 左轴图表：平均套压 + 平均油压（压力）
     chart_left = LineChart()
