@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """生产曲线模板门户 - Streamlit 主程序。
 
-当前提供“单井生产曲线模板”，并预留“天数叠合曲线模板”后续模板入口。
+当前提供“单井生产曲线模板”和“天数叠合曲线模板”。
 任何人访问网站后上传数据即可自动生成曲线并下载 Excel。
 
 启动方式：streamlit run app.py
@@ -12,7 +12,14 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from well_chart import cleaning, excel_export, loader, plotting
+from well_chart import cleaning, days_aligned, excel_export, loader, plotting
+from well_chart.days_aligned import (
+    ColumnDetector,
+    DaysAlignedProcessor,
+    DaysExcelExporter,
+    build_std_df,
+    preview_figure,
+)
 from well_chart.config import APP_VERSION, MIN_ROWS, get_logger
 
 logger = get_logger()
@@ -36,9 +43,10 @@ TEMPLATES = {
     },
     "天数叠合曲线模板": {
         "icon": "📆",
-        "status": "coming",
-        "badge": "开发中",
-        "desc": "多口井按生产天数叠合对比展示，即将上线。",
+        "status": "ready",
+        "badge": "当前可用",
+        "desc": "把单井历史数据按生产天数拉齐（同一天多条记录取平均），"
+                "输出时间拉齐数据、清洗日志和原生可编辑折线图。",
     },
 }
 
@@ -216,6 +224,104 @@ def run_single_well_flow(
     st.caption("「图片」子表内为原生 Excel 图表，双击即可编辑；修改处理后的数据，图表会自动更新。")
 
 
+def run_days_flow(uploaded) -> None:
+    """天数叠合曲线模板：上传 → 识别列 → 清洗 → 时间拉齐 → 下载。"""
+    try:
+        xls = pd.ExcelFile(uploaded)
+        sheet_name = xls.sheet_names[0]
+        raw = xls.parse(sheet_name=sheet_name, header=None)
+        header_row = loader._find_header_row(raw)
+        file_name = getattr(uploaded, "name", "upload.xlsx") or "upload.xlsx"
+        well_name = loader.extract_well_name(raw, header_row, sheet_name, file_name)
+        cols = ColumnDetector.detect(raw, header_row)
+        if cols is None:
+            st.warning("未能自动识别四列（日期/油压/套压/瞬时气量），请手动选择后继续。")
+            render_days_manual_selection(raw, header_row, well_name)
+        else:
+            run_days_process(raw, header_row, cols, well_name)
+    except loader.LoadError as exc:
+        st.error(f"文件格式错误：{exc}")
+        logger.error("文件格式错误：%s", exc)
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"处理过程中发生未预期错误：{exc}")
+        logger.exception("处理过程中发生未预期错误")
+
+
+def render_days_manual_selection(raw: pd.DataFrame, header_row: int, well_name: str) -> None:
+    """列名识别失败时，让用户手动选择四列。"""
+    options: dict[str, int] = {}
+    for j in range(raw.shape[1]):
+        for i in range(max(0, header_row - 2), header_row + 1):
+            value = raw.iat[i, j]
+            if isinstance(value, str) and value.strip():
+                options.setdefault(value.strip(), j)
+                break
+    if not options:
+        st.error("没有找到任何表头，请检查文件格式。")
+        st.stop()
+    labels = list(options.keys())
+    col1, col2, col3, col4 = st.columns(4)
+    date_label = col1.selectbox("日期列", labels, key="days_date")
+    oil_label = col2.selectbox("油压列", labels, key="days_oil")
+    casing_label = col3.selectbox("套压列", labels, key="days_casing")
+    gas_label = col4.selectbox("瞬时气量列", labels, key="days_gas")
+    if st.button("按所选列开始处理"):
+        chosen = {
+            "date": options[date_label],
+            "oil": options[oil_label],
+            "casing": options[casing_label],
+            "gas": options[gas_label],
+        }
+        if len(set(chosen.values())) < 4:
+            st.error("四列不能选择同一列，请重新选择。")
+            st.stop()
+        run_days_process(raw, header_row, chosen, well_name)
+    st.stop()
+
+
+def run_days_process(raw: pd.DataFrame, header_row: int, cols: dict, well_name: str) -> None:
+    """天数叠合模板处理主流程：清洗 → 时间拉齐 → 预览 → 下载。"""
+    with st.spinner("正在清洗数据并按生产天数拉齐..."):
+        df_std, log = build_std_df(raw, header_row, cols)
+        processor = DaysAlignedProcessor(df_std, well_name, log)
+        aligned, log_df, stats = processor.run()
+
+    st.success(f"处理完成：井号 {well_name}，共 {stats['days']} 个生产天数")
+
+    st.markdown('<div class="section-title">① 时间拉齐数据预览（前 10 行）</div>', unsafe_allow_html=True)
+    st.dataframe(aligned.head(10), width="stretch")
+
+    st.markdown('<div class="section-title">② 数据统计</div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("生产天数", f"{stats['days']} 天")
+    c2.metric("原始数据行数", f"{stats['raw_rows']} 行")
+    c3.metric("清洗操作数", f"{stats['log_count']} 条")
+
+    with st.expander("查看清洗日志"):
+        if log_df.empty:
+            st.info("本次没有清洗操作。")
+        else:
+            st.dataframe(log_df, width="stretch")
+    for _, row in log_df.iterrows():
+        if row["类别"] in ("固定值修复", "气量仪表修复", "日期解析"):
+            st.warning(f"{row['类别']}：{row['说明']}")
+
+    st.markdown('<div class="section-title">③ 曲线图预览</div>', unsafe_allow_html=True)
+    fig = preview_figure(aligned)
+    st.pyplot(fig)
+    plotting.close_fig(fig)
+
+    st.markdown('<div class="section-title">④ 下载结果</div>', unsafe_allow_html=True)
+    xlsx_bytes = DaysExcelExporter().export(aligned, log_df, well_name)
+    st.download_button(
+        label="下载 Excel 文件（时间拉齐数据 / 清洗日志 / 曲线图）",
+        data=xlsx_bytes,
+        file_name=f"{well_name}_天数叠合曲线.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.caption("「曲线图」子表为原生 Excel 折线图，可双击编辑；横坐标为生产天数，固定 6 个刻度。")
+
+
 def main() -> None:
     """页面主流程：模板选择 → 对应模板内容。"""
     inject_css()
@@ -241,17 +347,31 @@ def main() -> None:
         st.caption(
             f"版本 {APP_VERSION}\n\n"
             "· 单井生产曲线模板：已上线\n"
-            "· 天数叠合曲线模板：开发中"
+            "· 天数叠合曲线模板：已上线"
         )
 
     info = TEMPLATES[selected]
-    if info["status"] == "coming":
-        st.title(f"{info['icon']} {selected}")
-        render_coming_soon(selected)
-        st.stop()
-
     st.title(f"{info['icon']} {selected}")
     st.caption(info["desc"])
+
+    if selected == "天数叠合曲线模板":
+        days_upload = st.file_uploader(
+            "上传单井历史数据 Excel 文件（支持 .xls / .xlsx，需包含：日期、油压、套压、瞬时气量）",
+            type=["xls", "xlsx"],
+            key="days_upload",
+        )
+        if days_upload is None:
+            st.markdown('<div class="section-title">模板总览</div>', unsafe_allow_html=True)
+            render_template_cards()
+            with st.expander("使用说明"):
+                st.markdown(
+                    "1. 上传单井历史数据 Excel 文件；\n\n"
+                    "2. 系统自动识别四列（日期/油压/套压/瞬时气量），完成清洗并按生产天数拉齐；\n\n"
+                    "3. 下载 Excel，包含时间拉齐数据、清洗日志和原生可编辑折线图。"
+                )
+            st.stop()
+        run_days_flow(days_upload)
+        return
 
     uploaded = st.file_uploader(
         "上传单井历史数据 Excel 文件（支持 .xls / .xlsx，需包含：日期、油压、套压、瞬时气量）",
@@ -265,7 +385,8 @@ def main() -> None:
             st.markdown(
                 "1. 点击上方上传区域，选择本机的 Excel 数据文件；\n\n"
                 "2. 系统自动识别表头与井号，完成数据清洗并生成曲线图；\n\n"
-                "3. 点击“下载 Excel 文件”，得到包含三个子表的成品（原始数据、处理后的数据、图片）。"
+                "3. 点击“下载 Excel 文件”，得到成品（单井模板为三个子表，"
+                "天数叠合模板为时间拉齐数据/清洗日志/曲线图）。"
             )
         st.stop()
 
